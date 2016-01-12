@@ -84,7 +84,9 @@ setup(
         'dev': ['coverage', 'sphinx'],
     },
 
-    include_package_data=True,
+    package_data={
+        'sismic': ['schema.yaml']
+    },
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
