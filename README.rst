@@ -24,7 +24,7 @@ More specifically, Sismic provides:
 - Built-in support for expressing actions and guards using regular Python code
 - A design-by-contract approach for statecharts
 - A unit testing framework for statecharts, including generation of test scenarios
-
+- A graphical user interface to play with statecharts
 
 Installation
 ------------

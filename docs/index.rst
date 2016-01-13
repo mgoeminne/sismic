@@ -48,6 +48,7 @@ Sismic provides the following features:
 - Built-in support for expressing actions and guards using regular Python code
 - A design-by-contract approach for statecharts: contracts can be specified to express invariants, pre- and postconditions on states, transitions and the statechart itself.
 - A unit testing framework for statecharts, including generation of test scenarios
+- A graphical user interface to play with statecharts
 
 Sismic statecharts provides full support for the majority of the UML 2 statechart concepts:
 
