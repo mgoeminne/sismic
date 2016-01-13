@@ -5,6 +5,7 @@ from tkinter import messagebox
 from sismic.interpreter import Interpreter
 from sismic.io import import_from_yaml
 from sismic.model import Event
+from sismic.testing import ConditionFailed
 
 H_SPACE = 4
 V_SPACE = 4
@@ -38,15 +39,7 @@ class EventsFrame(ttk.Frame):
 
     def _cmd_btn_send(self):
         event_name = self._event_variable.get()
-        self._events.append(Event(event_name))
-
-    def get_events(self):
-        """
-        List of events to send
-        """
-        events = self._events[:]
-        self._events = []
-        return events
+        self._interpreter.queue(Event(event_name))
 
     def reset(self, interpreter):
         self._events = []
@@ -224,7 +217,7 @@ class ExecuteInterpreterFrame(ttk.Frame):
                                         ignore_contract=self._ignore_contract,
                                         initial_context=self._initial_context)
         self._autorun = False
-        self._autorun_delay = tk.StringVar(value='100')  # 100ms
+        self._autorun_delay = tk.IntVar(value=500)  # in ms
 
         self._create_widgets()
         self.update_content([])
@@ -273,19 +266,19 @@ class ExecuteInterpreterFrame(ttk.Frame):
         self._w_reset_btn.grid(row=5)
 
     def execute(self):
-        # Grep events
-        events = self._w_events_frame.get_events()
-        for event in events:
-            self._interpreter.send(event)
-
         # Update time
         if self._w_time_frame.automatic:
-            self._w_time_frame.elapse_time(int(self._autorun_delay.get()) / 1000)
+            self._w_time_frame.elapse_time(self._autorun_delay.get() / 1000)
 
-        self._interpreter.time = self._w_time_frame.time
+        self._interpreter.time = round(self._w_time_frame.time, 3)  # Interpreter's clock is in second
         try:
             steps = self._interpreter.execute()
             self.update_content(steps)
+        except ConditionFailed as e:
+            if self._autorun:
+                self._w_run_btn.invoke()
+            messagebox.showwarning('Contrat not satisfied', '{}\n\n{}'.format(str(e.__class__.__name__), str(e)))
+            self.update_content([])
         except Exception as e:
             if self._autorun:
                 self._w_run_btn.invoke()
@@ -294,7 +287,7 @@ class ExecuteInterpreterFrame(ttk.Frame):
 
         # Autorun?
         if self._autorun:
-            self.after(int(self._autorun_delay.get()), self.execute)
+            self.after(self._autorun_delay.get(), self.execute)
 
     def update_content(self, steps):
         self._w_events_frame.update_content(steps)
