@@ -10,7 +10,7 @@ from sismic.io import import_from_yaml
 from sismic.interpreter import Interpreter
 from sismic.model import Event
 
-from .stopwatch import Stopwatch
+from stopwatch import Stopwatch
 
 
 # Create a tiny GUI
@@ -82,25 +82,25 @@ class StopwatchApplication(tk.Frame):
         self.w_timer.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _start(self):
-        self.interpreter.send(Event('start'))
+        self.interpreter.queue(Event('start'))
         self.w_btn_start['state'] = tk.DISABLED
         self.w_btn_stop['state'] = tk.NORMAL
 
     def _stop(self):
-        self.interpreter.send(Event('stop'))
+        self.interpreter.queue(Event('stop'))
         self.w_btn_start['state'] = tk.NORMAL
         self.w_btn_stop['state'] = tk.DISABLED
 
     def _reset(self):
-        self.interpreter.send(Event('reset'))
+        self.interpreter.queue(Event('reset'))
 
     def _split(self):
-        self.interpreter.send(Event('split'))
+        self.interpreter.queue(Event('split'))
         self.w_btn_split['state'] = tk.DISABLED
         self.w_btn_unsplit['state'] = tk.NORMAL
 
     def _unsplit(self):
-        self.interpreter.send(Event('split'))
+        self.interpreter.queue(Event('split'))
         self.w_btn_split['state'] = tk.NORMAL
         self.w_btn_unsplit['state'] = tk.DISABLED
 

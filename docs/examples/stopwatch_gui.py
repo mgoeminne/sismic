@@ -39,7 +39,7 @@ class StopwatchApplication(tk.Frame):
         self.interpreter.execute()
 
         # Queue a call every 100ms on tk's mainloop
-        self.after(1000, self.run)
+        self.after(100, self.run)
 
         # Update the widget that contains the list of active states.
         self.w_states['text'] = 'active states: ' + ', '.join(self.interpreter.configuration)
@@ -81,25 +81,25 @@ class StopwatchApplication(tk.Frame):
             self.w_timer['text'] = event.time
 
     def _start(self):
-        self.interpreter.send(Event('start'))
+        self.interpreter.queue(Event('start'))
         self.w_btn_start['state'] = tk.DISABLED
         self.w_btn_stop['state'] = tk.NORMAL
 
     def _stop(self):
-        self.interpreter.send(Event('stop'))
+        self.interpreter.queue(Event('stop'))
         self.w_btn_start['state'] = tk.NORMAL
         self.w_btn_stop['state'] = tk.DISABLED
 
     def _reset(self):
-        self.interpreter.send(Event('reset'))
+        self.interpreter.queue(Event('reset'))
 
     def _split(self):
-        self.interpreter.send(Event('split'))
+        self.interpreter.queue(Event('split'))
         self.w_btn_split['state'] = tk.DISABLED
         self.w_btn_unsplit['state'] = tk.NORMAL
 
     def _unsplit(self):
-        self.interpreter.send(Event('split'))
+        self.interpreter.queue(Event('split'))
         self.w_btn_split['state'] = tk.NORMAL
         self.w_btn_unsplit['state'] = tk.DISABLED
 

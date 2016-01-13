@@ -1,6 +1,6 @@
 import abc
 import copy
-from .model import Event, Transition, StateMixin
+from sismic.model import Event, Transition, StateMixin
 
 
 class Evaluator(metaclass=abc.ABCMeta):
@@ -224,7 +224,7 @@ class PythonEvaluator(Evaluator):
         if not code:
             return
 
-        def send(name, **kwargs): self._interpreter.send(Event(name, **kwargs), internal=True)
+        def send(name, **kwargs): self._interpreter.queue(Event(name, **kwargs), internal=True)
 
         exposed_context = {
             'active': lambda s: s in self._interpreter.configuration,
