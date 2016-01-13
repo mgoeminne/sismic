@@ -190,9 +190,13 @@ class StatechartFrame(ttk.Frame):
                 event = transition.event.name
             except AttributeError:
                 event = ''
-            item = self._w_statelist.insert(from_state, 0, transition, tags='transition',
-                                            text='[{}] > {}'.format(event, to_state))
-            self._transition_items[transition] = item
+            try:
+                item = self._w_statelist.insert(from_state, 0, transition, tags='transition',
+                                                text='[{}] > {}'.format(event, to_state))
+                self._transition_items[transition] = item
+            except tk.TclError:
+                # Item already exists
+                pass
 
     def update_content(self, steps):
         entered = []
@@ -342,7 +346,8 @@ class ExecuteInterpreterFrame(ttk.Frame):
                                         ignore_contract=self._ignore_contract,
                                         initial_context=self._initial_context)
         self._autorun = False
-        self._autorun_delay = tk.IntVar(value=500)  # in ms
+        self._v_autorun_delay = tk.IntVar(value=200)  # in ms
+        self._v_multiple_checkbox = tk.BooleanVar(value=False)
 
         self._create_widgets()
         self.update_content([])
@@ -377,27 +382,32 @@ class ExecuteInterpreterFrame(ttk.Frame):
         execution_frame.pack(side=tk.TOP, fill=tk.X)
 
         label = ttk.Label(execution_frame, text='execution rate (in ms)')
-        self._w_refresh_entry = ttk.Entry(execution_frame, width=5, justify=tk.RIGHT, textvariable=self._autorun_delay)
-        self._w_execute_btn = ttk.Button(execution_frame, text='Execute step', width=14, command=self.execute)
+        self._w_refresh_entry = ttk.Entry(execution_frame, width=5, justify=tk.RIGHT, textvariable=self._v_autorun_delay)
+        self._w_execute_btn = ttk.Button(execution_frame, text='Execute', width=14, command=self.execute)
         self._w_run_btn = ttk.Button(execution_frame, text='Run statechart', width=14, command=self._cmd_run_btn)
         self._w_reset_btn = ttk.Button(execution_frame, text='Reset statechart', width=14, command=self.reset)
+        self._w_multiple_checkbox = ttk.Checkbutton(execution_frame, text='force step by step', variable=self._v_multiple_checkbox)
 
-        execution_frame.grid_columnconfigure(0, weight=1)
-        label.grid(row=0)
-        self._w_refresh_entry.grid(row=1)
-        ttk.Frame(execution_frame, height=V_SPACE).grid(row=2)
-        self._w_execute_btn.grid(row=3)
-        self._w_run_btn.grid(row=4)
-        self._w_reset_btn.grid(row=5)
+        label.pack(side=tk.TOP)
+        self._w_refresh_entry.pack(side=tk.TOP)
+        ttk.Frame(execution_frame, height=V_SPACE).pack(side=tk.TOP)
+        self._w_execute_btn.pack(side=tk.TOP)
+        self._w_run_btn.pack(side=tk.TOP)
+        self._w_reset_btn.pack(side=tk.TOP)
+        self._w_multiple_checkbox.pack(side=tk.TOP)
 
     def execute(self):
         # Update time
         if self._w_time_frame.automatic:
-            self._w_time_frame.elapse_time(self._autorun_delay.get() / 1000)
+            self._w_time_frame.elapse_time(self._v_autorun_delay.get() / 1000)
 
         self._interpreter.time = round(self._w_time_frame.time, 3)  # Interpreter's clock is in second
         try:
-            steps = self._interpreter.execute()
+            if self._v_multiple_checkbox.get():
+                step = self._interpreter.execute_once()
+                steps = [step] if step else []
+            else:
+                steps = self._interpreter.execute()
             self.update_content(steps)
         except ConditionFailed as e:
             if self._autorun:
@@ -412,7 +422,7 @@ class ExecuteInterpreterFrame(ttk.Frame):
 
         # Autorun?
         if self._autorun:
-            self.after(self._autorun_delay.get(), self.execute)
+            self.after(self._v_autorun_delay.get(), self.execute)
 
     def update_content(self, steps):
         self._w_events_frame.update_content(steps)

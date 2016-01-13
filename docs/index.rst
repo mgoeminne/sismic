@@ -82,6 +82,7 @@ The Sismic library is written in a modular way:
     :caption: Advanced topics
     :maxdepth: 1
 
+    advancedtopics/userinterface
     advancedtopics/dealingtime
     advancedtopics/communication
     advancedtopics/integrate_code
