@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 
 from sismic.interpreter import Interpreter
 from sismic.io import import_from_yaml
@@ -10,8 +10,8 @@ from sismic.testing import ConditionFailed
 H_SPACE = 4
 V_SPACE = 4
 
-# TODO: Load statechart frame
 # TODO: TreeView for states
+# TODO: Edit context values?
 
 class EventsFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
@@ -27,7 +27,7 @@ class EventsFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Events')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(self._w_labelframe, text='supported events').pack(side=tk.TOP)
+        ttk.Label(self._w_labelframe, text='guessed events').pack(side=tk.TOP)
 
         # Event list
         list_frame = ttk.Frame(self._w_labelframe)
@@ -79,13 +79,11 @@ class EventsFrame(ttk.Frame):
                 self._event_parameters_variable.get(), e.__class__.__name__, e
             ))
 
-
     def reset(self, interpreter):
         self._events = []
         self._interpreter = interpreter
         for event in self._interpreter._statechart.events():
             self._w_eventlist.insert('', tk.END, text=event)
-
 
     def update_content(self, steps=None):
         pass
@@ -200,7 +198,6 @@ class ContextFrame(ttk.Frame):
                 self._w_context.set(variable, 'value', value)
             except tk.TclError:
                 self._w_context.insert('', tk.END, iid=variable, text=variable, values=(value,))
-
 
 
 class LogsFrame(ttk.Frame):
@@ -377,21 +374,113 @@ class ExecuteInterpreterFrame(ttk.Frame):
             self.update_content([])
 
 
-def main():
-    with open('docs/examples/stopwatch.yaml') as f:
-        statechart = import_from_yaml(f)
+class ChooseInterpreterFrame(tk.Frame):
+    def __init__(self, master):
+        super().__init__(master)
 
+        self.create_widgets()
+
+    def create_widgets(self):
+        # File chooser
+        file_frame = ttk.LabelFrame(self, text='Statechart')
+        file_frame.pack(side=tk.TOP, fill=tk.X, pady=V_SPACE)
+        file_label = ttk.LabelFrame(file_frame, text='Select a .yaml statechart')
+        file_label.pack(side=tk.TOP)
+        file_chosen = ttk.Entry(file_frame)
+        file_chosen.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Frame(file_frame, width=H_SPACE).pack(side=tk.LEFT)
+        file_button = ttk.Button(file_frame, text='Choose', command=self._cmd_choose)
+        file_button.pack(side=tk.LEFT)
+
+        # Contracts
+        contract_frame = ttk.LabelFrame(self, text='Contracts')
+        contract_frame.pack(side=tk.TOP, fill=tk.X, pady=V_SPACE)
+        contract_check = ttk.Checkbutton(contract_frame, text='check contracts during execution')
+        contract_check.invoke()
+        contract_check.pack()
+
+        # Context
+        context_frame = ttk.LabelFrame(self, text='Context')
+        context_frame.pack(side=tk.TOP, fill=tk.BOTH, pady=V_SPACE)
+        context_label = ttk.Label(context_frame, text='You can define an initial context using the following text entry.'
+                                                      '\nSismic expects this entry to be a dictionary like structure.')
+        context_text = tk.Text(context_frame, width=60, height=6, wrap=tk.NONE)
+        context_text.insert('1.0', '{  # Content here, using \'key\': value, followed by a comma\n\n}\n')
+        context_scrollbar_h = ttk.Scrollbar(context_frame, orient=tk.HORIZONTAL, command=context_text.xview)
+        context_scrollbar_v = ttk.Scrollbar(context_frame, command=context_text.yview)
+        context_text.config(xscrollcommand=context_scrollbar_h.set, yscrollcommand=context_scrollbar_v.set)
+
+        context_frame.grid_rowconfigure(1, weight=1)
+        context_frame.grid_columnconfigure(0, weight=1)
+
+        context_label.grid(row=0, column=0, columnspan=2, sticky=tk.W)
+        context_text.grid(row=1, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
+        context_scrollbar_v.grid(row=1, column=1, sticky=tk.N + tk.S)
+        context_scrollbar_h.grid(row=2, column=0, sticky=tk.E + tk.W)
+
+        # Button
+        button = ttk.Button(self, text='Next', command=self._cmd_start)
+        button.pack(side=tk.TOP, pady=V_SPACE)
+
+        # Expose some of them
+        self._w_file_chosen = file_chosen
+        self._w_contract_check = contract_check
+        self._w_context_text = context_text
+
+    def _cmd_choose(self):
+        choice = filedialog.askopenfilename(filetypes=[('YAML files', '.yaml'), ('All files', '*')])
+
+        if choice:
+            self._w_file_chosen.delete(0, tk.END)
+            self._w_file_chosen.insert(0, choice)
+
+    def _cmd_start(self):
+        # Check chosen file
+        chosen_file = self._w_file_chosen.get()
+        try:
+            with open(chosen_file) as f:
+                statechart = import_from_yaml(f)
+        except Exception as e:
+            messagebox.showerror('Error', 'Unable to use "{}" as a statechart.\n\n{}\n{}'.format(
+                chosen_file, e.__class__.__name__, e
+            ))
+            return
+
+        # Check contract
+        ignore_contract = (tuple() == self._w_contract_check.state())
+
+        # Check context
+        context = self._w_context_text.get('0.1', tk.END)
+        try:
+            context = eval(context)
+        except Exception as e:
+            messagebox.showerror('Error', 'Unable to parse initial context:\n{}\n\n{}\n{}'.format(
+                context, e.__class__.__name__, e
+            ))
+            return
+
+        self.destroy()
+        self.master.wm_minsize(800, 600)
+        app = ExecuteInterpreterFrame(self.master,
+                                      statechart=statechart,
+                                      ignore_contract=ignore_contract,
+                                      initial_context=context)
+        app.pack(fill=tk.BOTH, expand=True, padx=H_SPACE, pady=V_SPACE)
+
+
+
+def main():
     root = tk.Tk()
     root.wm_title('Sismic-ui')
-    root.wm_minsize(800, 600)
 
     style = ttk.Style()
     style.configure('TLabelframe', padding=H_SPACE)
 
-    app = ExecuteInterpreterFrame(root, statechart=statechart, ignore_contract=False, initial_context={})
+    app = ChooseInterpreterFrame(root)
     app.pack(fill=tk.BOTH, expand=True, padx=H_SPACE, pady=V_SPACE)
 
     root.mainloop()
+
 
 if __name__ == '__main__':
     main()
