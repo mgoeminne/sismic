@@ -10,9 +10,6 @@ from sismic.testing import ConditionFailed
 H_SPACE = 4
 V_SPACE = 4
 
-# TODO: Edit context values?
-# TODO: Documentation
-# TODO: CLI
 
 class EventsFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
@@ -28,7 +25,7 @@ class EventsFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Events')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(self._w_labelframe, text='guessed events').pack(side=tk.TOP)
+        ttk.Label(self._w_labelframe, text='suggested events').pack(side=tk.TOP)
 
         # Event list
         list_frame = ttk.Frame(self._w_labelframe)
