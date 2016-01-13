@@ -10,10 +10,8 @@ from sismic.testing import ConditionFailed
 H_SPACE = 4
 V_SPACE = 4
 
-# TODO: Event parameter: event list that populates a field, + additional dict
 # TODO: Load statechart frame
 # TODO: TreeView for states
-# TODO: TreeView (for the columns) for logs
 
 class EventsFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
@@ -21,6 +19,7 @@ class EventsFrame(ttk.Frame):
         self._events = []
 
         self._event_variable = tk.StringVar()
+        self._event_parameters_variable = tk.StringVar(value='{}')
         self._create_widgets()
         self.reset(interpreter)
 
@@ -28,23 +27,65 @@ class EventsFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Events')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(self._w_labelframe, text='select event name').pack(side=tk.TOP)
-        self._w_eventlist = ttk.Combobox(self._w_labelframe, textvariable=self._event_variable)
-        self._w_eventlist.pack(side=tk.TOP, fill=tk.X)
+        ttk.Label(self._w_labelframe, text='supported events').pack(side=tk.TOP)
 
+        # Event list
+        list_frame = ttk.Frame(self._w_labelframe)
+        list_frame.pack(side=tk.TOP, fill=tk.X, expand=True)
+        list_frame.grid_columnconfigure(0, weight=1)
+
+        self._w_eventlist = ttk.Treeview(list_frame, selectmode=tk.BROWSE, show='tree')
+        self._w_eventlist.column('#0', width=100)
+        self._w_eventlist.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
+        self._w_eventlist.bind('<<TreeviewSelect>>', self._cmd_treeview_select, '+')
+
+        # scrollbar
+        scrollbar_v = ttk.Scrollbar(list_frame, command=self._w_eventlist.yview)
+        self._w_eventlist.config(yscrollcommand=scrollbar_v.set)
+        scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
+
+        # Name & context
+        ttk.Frame(self._w_labelframe, height=V_SPACE).pack(side=tk.TOP)
+
+        ttk.Label(self._w_labelframe, text='Event name:').pack(side=tk.TOP, anchor=tk.W)
+        ttk.Entry(self._w_labelframe, textvariable=self._event_variable).pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
+        ttk.Label(self._w_labelframe, text='Event parameters:').pack(side=tk.TOP, anchor=tk.W)
+        ttk.Entry(self._w_labelframe, textvariable=self._event_parameters_variable).pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
+
+        # Send button
         self._w_btn_send = ttk.Button(self._w_labelframe, text='Queue event', width=14, command=self._cmd_btn_send)
         self._w_btn_send.pack(side=tk.BOTTOM)
 
         ttk.Frame(self._w_labelframe, height=V_SPACE).pack(side=tk.BOTTOM)
 
+    def _cmd_treeview_select(self, e):
+        item = self._w_eventlist.focus()
+        if item:
+            name = self._w_eventlist.item(item, 'text')
+            self._event_variable.set(name)
+
     def _cmd_btn_send(self):
         event_name = self._event_variable.get()
-        self._interpreter.queue(Event(event_name))
+
+        # Try to parse parameters
+        try:
+            parameters = eval(self._event_parameters_variable.get())
+
+            self._interpreter.queue(Event(event_name, **parameters))
+            self._event_variable.set('')
+            self._event_parameters_variable.set('{}')
+        except Exception as e:
+            messagebox.showerror('Error in event parameters', 'Value: {}\n\n{}\n{}'.format(
+                self._event_parameters_variable.get(), e.__class__.__name__, e
+            ))
+
 
     def reset(self, interpreter):
         self._events = []
         self._interpreter = interpreter
-        self._w_eventlist.config(values=sorted(self._interpreter._statechart.events()) + ['<new>'])
+        for event in self._interpreter._statechart.events():
+            self._w_eventlist.insert('', tk.END, text=event)
+
 
     def update_content(self, steps=None):
         pass
