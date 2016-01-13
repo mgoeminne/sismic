@@ -12,25 +12,23 @@ V_SPACE = 4
 # TODO: Event parameter: event list that populates a field, + additional dict
 # TODO: Load statechart frame
 # TODO: TreeView for states
-# TODO: TreeView (for the columns feature) for context
 # TODO: TreeView (for the columns) for logs
 
 class EventsFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
         super().__init__(master, **kwargs)
-        self._interpreter = interpreter
         self._events = []
 
         self._event_variable = tk.StringVar()
         self._create_widgets()
+        self.reset(interpreter)
 
     def _create_widgets(self):
         self._w_labelframe = ttk.LabelFrame(self, text='Events')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(self._w_labelframe, text='select event name').pack(side=tk.TOP)
-        self._w_eventlist = ttk.Combobox(self._w_labelframe, textvariable=self._event_variable,
-                                         values=sorted(self._interpreter._statechart.events()) + ['<new>'])
+        self._w_eventlist = ttk.Combobox(self._w_labelframe, textvariable=self._event_variable)
         self._w_eventlist.pack(side=tk.TOP, fill=tk.X)
 
         self._w_btn_send = ttk.Button(self._w_labelframe, text='Queue event', width=14, command=self._cmd_btn_send)
@@ -50,22 +48,24 @@ class EventsFrame(ttk.Frame):
         self._events = []
         return events
 
+    def reset(self, interpreter):
+        self._events = []
+        self._interpreter = interpreter
+        self._w_eventlist.config(values=sorted(self._interpreter._statechart.events()) + ['<new>'])
+
     def update_content(self, steps=None):
         pass
-
-    def set_interpreter(self, interpreter):
-        self._interpreter = interpreter
-        self._events = []
-        self._w_eventlist.config(values=sorted(self._interpreter._statechart.events()) + ['<<new>>'])
 
 
 class TimeFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
         super().__init__(master, **kwargs)
-        self._interpreter = interpreter
+
         self._automatic = tk.BooleanVar(value=True)
-        self._time = tk.DoubleVar(value=0)
+        self._time = tk.DoubleVar()
+
         self._create_widgets()
+        self.reset(interpreter)
 
     @property
     def automatic(self):
@@ -79,14 +79,14 @@ class TimeFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Time')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        time = tk.Entry(self._w_labelframe, textvariable=self._time, width=8)
+        time = tk.Entry(self._w_labelframe, textvariable=self._time, width=8, justify=tk.RIGHT)
         checkbox = tk.Checkbutton(self._w_labelframe, text='autoupdate', variable=self._automatic)
 
         time.pack(side=tk.TOP, anchor=tk.CENTER)
         checkbox.pack(side=tk.TOP, anchor=tk.CENTER)
 
-    def reset(self):
-        self._time.set(0)
+    def reset(self, interpreter):
+        self._time.set(interpreter.time)
 
     def update_content(self, steps):
         pass
@@ -95,16 +95,13 @@ class TimeFrame(ttk.Frame):
         if self.automatic:
             self._time.set(round(self._time.get() + delta, 3))
 
-    def set_interpreter(self, interpreter):
-        self._interpreter = interpreter
-
 
 class StatechartFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
         super().__init__(master, **kwargs)
-        self._interpreter = interpreter
 
         self._create_widgets()
+        self.reset(interpreter)
 
     def _create_widgets(self):
         self._w_labelframe = ttk.LabelFrame(self, text='Statechart')
@@ -112,6 +109,9 @@ class StatechartFrame(ttk.Frame):
 
         self._w_content = ttk.Label(self._w_labelframe, anchor=tk.NW, justify=tk.LEFT)
         self._w_content.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+    def reset(self, interpreter):
+        self._interpreter = interpreter
 
     def update_content(self, steps):
         states = self._interpreter._statechart.states
@@ -124,38 +124,46 @@ class StatechartFrame(ttk.Frame):
                 content.append(state)
         self._w_content.config(text='\n'.join(sorted(content)))
 
-    def set_interpreter(self, interpreter):
-        self._interpreter = interpreter
-
 
 class ContextFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
         super().__init__(master, **kwargs)
-        self._interpreter = interpreter
 
         self._create_widgets()
+        self.reset(interpreter)
 
     def _create_widgets(self):
         self._w_labelframe = ttk.LabelFrame(self, text='Context')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        self._w_content = ttk.Label(self._w_labelframe, anchor=tk.NW, justify=tk.LEFT)
-        self._w_content.pack(fill=tk.BOTH, expand=True)
+        self._w_context = ttk.Treeview(self._w_labelframe, columns=('value',), selectmode=tk.NONE)
+        self._w_context.column('#0', width=35)
+        self._w_context.heading('#0', text='variable')
+        self._w_context.column('value', width=100)
+        self._w_context.heading('value', text='value')
+
+        self._w_context.pack(fill=tk.BOTH, expand=True)
+
+    def reset(self, interpreter):
+        self._interpreter = interpreter
+        self._w_context.delete(*self._w_context.get_children())
 
     def update_content(self, steps):
-        content = '\n'.join(['{}: {}'.format(k, v) for k, v in self._interpreter.context.items()])
-        self._w_content.config(text=content)
+        for variable, value in self._interpreter.context.items():
+            try:
+                self._w_context.set(variable, 'value', value)
+            except tk.TclError:
+                self._w_context.insert('', tk.END, iid=variable, text=variable, values=(value,))
 
-    def set_interpreter(self, interpreter):
-        self._interpreter = interpreter
 
 
 class LogsFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
         super().__init__(master, **kwargs)
-        self._interpreter = interpreter
+
         self._autoscroll_variable = tk.BooleanVar(value=True)
         self._create_widgets()
+        self.reset(interpreter)
 
     def _create_widgets(self):
         self._w_labelframe = ttk.LabelFrame(self, text='Logs')
@@ -190,7 +198,8 @@ class LogsFrame(ttk.Frame):
         self._w_scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
         self._w_scrollbar_h.grid(row=1, column=0, sticky=tk.E + tk.W)
 
-    def reset(self):
+    def reset(self, interpreter):
+        self._interpreter = interpreter
         self._cmd_btn_clear()
 
     def _cmd_btn_clear(self):
@@ -201,9 +210,6 @@ class LogsFrame(ttk.Frame):
             self._w_content.insert(tk.END, str(step) + '\n')
         if self._autoscroll_variable.get():
             self._w_content.see(tk.END)
-
-    def set_interpreter(self, interpreter):
-        self._interpreter = interpreter
 
 
 class ExecuteInterpreterFrame(ttk.Frame):
@@ -316,8 +322,12 @@ class ExecuteInterpreterFrame(ttk.Frame):
                                             initial_context=self._initial_context)
             if self._autorun:
                 self._w_run_btn.invoke()
-            self._w_logs_frame.reset()
-            self._w_time_frame.reset()
+            self._w_events_frame.reset(self._interpreter)
+            self._w_time_frame.reset(self._interpreter)
+            self._w_statechart_frame.reset(self._interpreter)
+            self._w_context_frame.reset(self._interpreter)
+            self._w_logs_frame.reset(self._interpreter)
+
             self.update_content([])
 
 
