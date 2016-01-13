@@ -129,13 +129,25 @@ class ContextFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Context')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
+        # Context
         self._w_context = ttk.Treeview(self._w_labelframe, columns=('value',), selectmode=tk.NONE)
         self._w_context.column('#0', width=35)
         self._w_context.heading('#0', text='variable')
         self._w_context.column('value', width=100)
         self._w_context.heading('value', text='value')
 
-        self._w_context.pack(fill=tk.BOTH, expand=True)
+        # Scrollbars
+        scrollbar_h = ttk.Scrollbar(self._w_labelframe, orient=tk.HORIZONTAL, command=self._w_context.xview)
+        scrollbar_v = ttk.Scrollbar(self._w_labelframe, command=self._w_context.yview)
+        self._w_context.config(xscrollcommand=scrollbar_h.set, yscrollcommand=scrollbar_v.set)
+
+        # Geometry
+        self._w_context.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
+        self._w_labelframe.grid_rowconfigure(0, weight=1)
+        self._w_labelframe.grid_columnconfigure(0, weight=1)
+        scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
+        scrollbar_h.grid(row=1, column=0, sticky=tk.E + tk.W)
+
 
     def reset(self, interpreter):
         self._interpreter = interpreter
