@@ -10,7 +10,6 @@ from sismic.testing import ConditionFailed
 H_SPACE = 4
 V_SPACE = 4
 
-# TODO: TreeView for states
 # TODO: Edit context values?
 # TODO: Documentation
 # TODO: CLI
@@ -74,8 +73,9 @@ class EventsFrame(ttk.Frame):
             parameters = eval(self._event_parameters_variable.get())
 
             self._interpreter.queue(Event(event_name, **parameters))
-            self._event_variable.set('')
             self._event_parameters_variable.set('{}')
+            self._w_btn_send.config(state=tk.DISABLED)
+            self.after(200, lambda: self._w_btn_send.config(state=tk.NORMAL))
         except Exception as e:
             messagebox.showerror('Error in event parameters', 'Value: {}\n\n{}\n{}'.format(
                 self._event_parameters_variable.get(), e.__class__.__name__, e
@@ -141,23 +141,96 @@ class StatechartFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Statechart')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        self._w_content = ttk.Label(self._w_labelframe, anchor=tk.NW, justify=tk.LEFT)
-        self._w_content.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        # States
+        self._w_statelist = ttk.Treeview(self._w_labelframe, selectmode=tk.NONE, show='tree')
+        self._w_statelist.column('#0', width=200)
+        self._w_statelist.tag_configure('state_active', foreground='steel blue')
+        self._w_statelist.tag_configure('state_entered', foreground='forest green')
+        self._w_statelist.tag_configure('state_exited', foreground='red')
+        self._w_statelist.tag_configure('state_entered_and_exited', foreground='dark orange')
+
+        self._w_statelist.tag_configure('transition', foreground='gray')
+        self._w_statelist.tag_configure('transition_active', foreground='red')
+
+        # Scrollbars
+        scrollbar_h = ttk.Scrollbar(self._w_labelframe, orient=tk.HORIZONTAL, command=self._w_statelist.xview)
+        scrollbar_v = ttk.Scrollbar(self._w_labelframe, command=self._w_statelist.yview)
+        self._w_statelist.config(xscrollcommand=scrollbar_h.set, yscrollcommand=scrollbar_v.set)
+
+        # Geometry
+        self._w_statelist.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
+        self._w_labelframe.grid_rowconfigure(0, weight=1)
+        self._w_labelframe.grid_columnconfigure(0, weight=1)
+        scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
+        scrollbar_h.grid(row=1, column=0, sticky=tk.E + tk.W)
 
     def reset(self, interpreter):
         self._interpreter = interpreter
+        self._w_statelist.delete(*self._w_statelist.get_children())
+        self._state_items = {}
+        self._transition_items = {}
+
+        statechart = self._interpreter._statechart
+
+        # top-level states
+        for state in self._interpreter._statechart.children:
+            item = self._w_statelist.insert('', tk.END, state, text=state, open=True)
+            self._state_items[state] = item
+            # Descendants
+            for descendant in statechart.descendants_for(state):
+                parent = statechart._parent[descendant]
+                item = self._w_statelist.insert(parent, tk.END, descendant, text=descendant, open=True)
+                self._state_items[descendant] = item
+
+        # Transitions
+        for transition in statechart.transitions:
+            from_state = transition.from_state
+            to_state = transition.to_state if transition.to_state else '(internal)'
+            try:
+                event = transition.event.name
+            except AttributeError:
+                event = ''
+            item = self._w_statelist.insert(from_state, 0, transition, tags='transition',
+                                            text='[{}] > {}'.format(event, to_state))
+            self._transition_items[transition] = item
 
     def update_content(self, steps):
-        states = self._interpreter._statechart.states
-        active = self._interpreter.configuration
-        content = []
-        for state in states:
-            if state in active:
-                content.append('{} *'.format(state))
-            else:
-                content.append(state)
-        self._w_content.config(text='\n'.join(sorted(content)))
+        entered = []
+        exited = []
+        transitions = []
 
+        for step in steps:
+            entered += step.entered_states
+            exited += step.exited_states
+            transitions += step.transitions
+
+        # Reset items
+        for name, item in self._state_items.items():
+            self._w_statelist.item(item, tags=tk.NONE)
+            self._w_statelist.item(item, text=name)
+        for name, item in self._transition_items.items():
+            self._w_statelist.item(item, tags='transition')
+
+        # Active states
+        for state in self._interpreter.configuration:
+            self._w_statelist.item(self._state_items[state], tags='state_active')
+
+        # Entered states
+        for state in entered:
+            self._w_statelist.item(self._state_items[state], tags='state_entered')
+
+        # Exited states
+        for state in exited:
+            self._w_statelist.item(self._state_items[state], tags='state_exited')
+
+        # Both (may happen as we consider several MacroStep at once)
+        for state in set(entered).intersection(exited):
+            self._w_statelist.item(self._state_items[state], tags='state_entered_and_exited')
+
+        # Transitions
+        for transition in transitions:
+            item = self._transition_items[transition]
+            self._w_statelist.item(item, tags='transition_active')
 
 class ContextFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
