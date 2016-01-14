@@ -151,16 +151,14 @@ class StatechartFrame(ttk.Frame):
         self._w_statelist.tag_configure('transition_active', foreground='red')
 
         # Scrollbars
-        scrollbar_h = ttk.Scrollbar(self._w_labelframe, orient=tk.HORIZONTAL, command=self._w_statelist.xview)
         scrollbar_v = ttk.Scrollbar(self._w_labelframe, command=self._w_statelist.yview)
-        self._w_statelist.config(xscrollcommand=scrollbar_h.set, yscrollcommand=scrollbar_v.set)
+        self._w_statelist.config(yscrollcommand=scrollbar_v.set)
 
         # Geometry
         self._w_statelist.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
         self._w_labelframe.grid_rowconfigure(0, weight=1)
         self._w_labelframe.grid_columnconfigure(0, weight=1)
         scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
-        scrollbar_h.grid(row=1, column=0, sticky=tk.E + tk.W)
 
     def reset(self, interpreter):
         self._interpreter = interpreter
@@ -234,6 +232,7 @@ class StatechartFrame(ttk.Frame):
             item = self._transition_items[transition]
             self._w_statelist.item(item, tags='transition_active')
 
+
 class ContextFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
         super().__init__(master, **kwargs)
@@ -253,17 +252,14 @@ class ContextFrame(ttk.Frame):
         self._w_context.heading('value', text='value')
 
         # Scrollbars
-        scrollbar_h = ttk.Scrollbar(self._w_labelframe, orient=tk.HORIZONTAL, command=self._w_context.xview)
         scrollbar_v = ttk.Scrollbar(self._w_labelframe, command=self._w_context.yview)
-        self._w_context.config(xscrollcommand=scrollbar_h.set, yscrollcommand=scrollbar_v.set)
+        self._w_context.config(yscrollcommand=scrollbar_v.set)
 
         # Geometry
         self._w_context.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
         self._w_labelframe.grid_rowconfigure(0, weight=1)
         self._w_labelframe.grid_columnconfigure(0, weight=1)
         scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
-        scrollbar_h.grid(row=1, column=0, sticky=tk.E + tk.W)
-
 
     def reset(self, interpreter):
         self._interpreter = interpreter
