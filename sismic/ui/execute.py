@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox, filedialog
 
+from collections import OrderedDict
+
 from sismic.interpreter import Interpreter
 from sismic.io import import_from_yaml
 from sismic.model import Event, FinalState, OrthogonalState, HistoryState
@@ -11,10 +13,144 @@ H_SPACE = 4
 V_SPACE = 4
 
 
+# TODO: Use dictframe for the context
 # TODO: Make the context editable
 # TODO: Breakpoints?
 # TODO: Interpreter bind?
 # TODO: Stories (import/export)?
+
+
+class DictFrame(ttk.Frame):
+    def __init__(self, master, initial=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self._initial = initial if initial else {}
+
+        self._v_key = tk.StringVar(value='')
+        self._v_value = tk.StringVar(value='')
+        self._create_widgets()
+        self.reset()
+
+    def _create_widgets(self):
+        ttk.Label(self, text='Enter (key, value) pairs.').pack(side=tk.TOP)
+
+        treeview = ttk.Treeview(self, columns=('value',), selectmode=tk.BROWSE, height=5)
+        treeview.heading('#0', text='key')
+        treeview.heading('value', text='value')
+
+        def _select_item(e):
+            self._w_edit_btn.config(state=tk.NORMAL)
+            self._w_remove_btn.config(state=tk.NORMAL)
+            item = self._treeview.focus()
+            self._v_key.set(self._treeview.item(item, 'text'))
+            self._v_value.set(self._treeview.set(item, 'value'))
+
+        treeview.bind('<<TreeviewSelect>>', _select_item, '+')
+        treeview.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        add_frame = ttk.Frame(self, padding=H_SPACE)
+        add_frame.pack(side=tk.TOP, fill=tk.X, expand=True)
+        ttk.Label(add_frame, text='key:').grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(add_frame, text='value:').grid(row=0, column=1, sticky=tk.W)
+        ttk.Entry(add_frame, textvariable=self._v_key).grid(row=1, column=0, sticky=tk.E + tk.W)
+        ttk.Entry(add_frame, textvariable=self._v_value).grid(row=1, column=1, sticky=tk.E + tk.W)
+        self._w_add_btn = ttk.Button(add_frame, text='Add', command=self._add_item)
+        self._w_add_btn.grid(row=1, column=2)
+        self._w_edit_btn = ttk.Button(add_frame, text='Edit selected', state=tk.DISABLED, command=self._edit_item)
+        self._w_edit_btn.grid(row=1, column=3)
+        self._w_remove_btn = ttk.Button(add_frame, text='Remove selected', state=tk.DISABLED, command=self._remove_item)
+        self._w_remove_btn.grid(row=1, column=4)
+        add_frame.grid_columnconfigure(0, weight=1)
+        add_frame.grid_columnconfigure(1, weight=1)
+
+        self._treeview = treeview
+
+    def _add_item(self):
+        # Check key duplicate
+        key = self._v_key.get()
+        if key in self._dict:
+            messagebox.showerror('Key already exists', 'Key "{}" already exists!'.format(key))
+            return
+
+        # Parse value
+        value = self._v_value.get()
+        try:
+            value = eval(value)
+        except Exception as e:
+            messagebox.showerror('Value error', 'Unable to convert "{}" to a value.\n\n{}\n{}'.format(
+                value, e.__class__.__name__, e
+            ))
+            return
+
+        item = self._treeview.insert('', tk.END, text=key)
+        self._treeview.set(item, 'value', self._v_value.get())
+
+        self._dict[key] = value
+
+        # Reset
+        self._v_key.set('')
+        self._v_value.set('')
+
+        self._treeview.selection_set('')
+        self._w_edit_btn.config(state=tk.DISABLED)
+        self._w_remove_btn.config(state=tk.DISABLED)
+
+    def _edit_item(self):
+        # Check key duplicate
+        key = self._v_key.get()
+
+        # Parse value
+        value = self._v_value.get()
+        try:
+            value = eval(value)
+        except Exception as e:
+            messagebox.showerror('Value error', 'Unable to convert "{}" to a value.\n\n{}\n{}'.format(
+                value, e.__class__.__name__, e
+            ))
+            return
+
+        # Existing items
+        item = self._treeview.focus()
+        old_key = self._treeview.item(item, 'text')
+
+        if old_key != key:
+            # Remove old item
+            self._dict.pop(old_key)
+            self._treeview.delete(item)
+
+            # Add new item
+            item = self._treeview.insert('', tk.END, text=key)
+
+        # Set and save value
+        self._treeview.set(item, 'value', value)
+        self._dict[key] = value
+
+        self._treeview.selection_set(item)
+
+    def _remove_item(self):
+        item = self._treeview.focus()
+        key = self._treeview.item(item, 'text')
+
+        # Remove item
+        self._dict.pop(key)
+        self._treeview.delete(item)
+
+        # Reset buttons
+        self._w_edit_btn.config(state=tk.DISABLED)
+        self._w_remove_btn.config(state=tk.DISABLED)
+
+    def get_dict(self):
+        return self._dict
+
+    def reset(self):
+        self._v_key.set('')
+        self._v_value.set('')
+        self._dict = OrderedDict()
+        self._treeview.delete(*self._treeview.get_children())
+
+        for k, v in self._initial.items():
+            self._dict[k] = v
+            item = self._treeview.insert('', tk.END, text=k)
+            self._treeview.set(item, 'value', v)
 
 
 class EventsFrame(ttk.Frame):
@@ -23,6 +159,7 @@ class EventsFrame(ttk.Frame):
         self._events = []
 
         self._event_variable = tk.StringVar()
+        self._reset_parameters = tk.BooleanVar(value=False)
         self._event_parameters_variable = tk.StringVar(value='{}')
         self._create_widgets()
         self.reset(interpreter)
@@ -39,55 +176,70 @@ class EventsFrame(ttk.Frame):
         list_frame.grid_columnconfigure(0, weight=1)
         list_frame.grid_rowconfigure(0, weight=1)
 
-        self._w_eventlist = ttk.Treeview(list_frame, selectmode=tk.BROWSE, height=3, show='tree')
+        self._w_eventlist = ttk.Treeview(list_frame, selectmode=tk.BROWSE, height=5, show='tree')
         self._w_eventlist.column('#0', width=100)
         self._w_eventlist.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
-        self._w_eventlist.bind('<<TreeviewSelect>>', self._cmd_treeview_select, '+')
 
         # scrollbar
         scrollbar_v = ttk.Scrollbar(list_frame, command=self._w_eventlist.yview)
         self._w_eventlist.config(yscrollcommand=scrollbar_v.set)
         scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
 
-        # Name & context
         ttk.Frame(self._w_labelframe, height=V_SPACE).pack(side=tk.TOP)
 
-        ttk.Label(self._w_labelframe, text='Event name:').pack(side=tk.TOP, anchor=tk.W)
-        ttk.Entry(self._w_labelframe, textvariable=self._event_variable).pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
-        ttk.Label(self._w_labelframe, text='Event parameters:').pack(side=tk.TOP, anchor=tk.W)
-        ttk.Entry(self._w_labelframe, textvariable=self._event_parameters_variable).pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
+        self._w_event_parameter_btn = ttk.Button(self._w_labelframe, text='Set parameters', width=14, command=self._cmd_set_parameters)
+        self._w_event_parameter_btn.pack(side=tk.TOP)
+
+        ttk.Frame(self._w_labelframe, height=V_SPACE).pack(side=tk.TOP)
 
         # Send button
         self._w_btn_send = ttk.Button(self._w_labelframe, text='Queue event', width=14, command=self._cmd_btn_send)
-        self._w_btn_send.pack(side=tk.BOTTOM)
+        self._w_btn_send.pack(side=tk.TOP)
+
+        # Reset parameters option
+        ttk.Checkbutton(self._w_labelframe, text='reset after queueing', variable=self._reset_parameters).pack(side=tk.TOP)
 
         ttk.Frame(self._w_labelframe, height=V_SPACE).pack(side=tk.BOTTOM)
 
-    def _cmd_treeview_select(self, e):
-        item = self._w_eventlist.focus()
-        if item:
-            name = self._w_eventlist.item(item, 'text')
-            self._event_variable.set(name)
+    def _cmd_set_parameters(self):
+        top = tk.Toplevel()
+        top.title('Enter parameters')
+
+        frame = DictFrame(top, initial=self._event_parameters, padding=H_SPACE)
+        frame.pack(fill=tk.BOTH, expand=1)
+
+        def _validate():
+            self._event_parameters = frame.get_dict()
+            top.destroy()
+
+        ttk.Button(frame, text='Ok', command=_validate).pack(side=tk.LEFT, anchor=tk.CENTER)
+        ttk.Button(frame, text='Cancel', command=top.destroy).pack(side=tk.RIGHT, anchor=tk.CENTER)
 
     def _cmd_btn_send(self):
-        event_name = self._event_variable.get()
+        item = self._w_eventlist.focus()
+        if item == '':
+            messagebox.showerror('No selected event', 'You must select an event first.')
+            return
+        event_name = self._w_eventlist.item(item, 'text')
+        event_parameters = self._event_parameters
 
-        # Try to parse parameters
-        try:
-            parameters = eval(self._event_parameters_variable.get())
+        self._interpreter.queue(Event(event_name, **event_parameters))
 
-            self._interpreter.queue(Event(event_name, **parameters))
-            self._event_parameters_variable.set('{}')
-            self._w_btn_send.config(state=tk.DISABLED)
-            self.after(200, lambda: self._w_btn_send.config(state=tk.NORMAL))
-        except Exception as e:
-            messagebox.showerror('Error in event parameters', 'Value: {}\n\n{}\n{}'.format(
-                self._event_parameters_variable.get(), e.__class__.__name__, e
-            ))
+        # Reset selection and parameters
+        if not self._reset_parameters.get():
+            self._event_parameters = {}
+            self._w_eventlist.selection_remove(item)
+
+        # Do something to inform that event is sent
+        self._w_btn_send.config(state=tk.DISABLED)
+        self.after(200, lambda: self._w_btn_send.config(state=tk.NORMAL))
 
     def reset(self, interpreter):
         self._events = []
+        self._event_parameters = OrderedDict()
         self._interpreter = interpreter
+        self._w_eventlist.delete(*self._w_eventlist.get_children())
+
         for event in self._interpreter.statechart.events():
             self._w_eventlist.insert('', tk.END, text=event)
 
@@ -117,11 +269,14 @@ class TimeFrame(ttk.Frame):
         self._w_labelframe = ttk.LabelFrame(self, text='Time')
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
-        time = tk.Entry(self._w_labelframe, textvariable=self._time, width=8, justify=tk.RIGHT)
-        checkbox = tk.Checkbutton(self._w_labelframe, text='autoupdate', variable=self._automatic)
+        inner_frame = ttk.Frame(self._w_labelframe)
+        inner_frame.pack(side=tk.TOP, anchor=tk.CENTER)
 
-        time.pack(side=tk.TOP, anchor=tk.CENTER)
-        checkbox.pack(side=tk.TOP, anchor=tk.CENTER)
+        time = tk.Entry(inner_frame, textvariable=self._time, width=5, justify=tk.RIGHT)
+        checkbox = tk.Checkbutton(inner_frame, text='autoupdate', variable=self._automatic)
+
+        time.pack(side=tk.LEFT, anchor=tk.CENTER)
+        checkbox.pack(side=tk.LEFT, anchor=tk.CENTER)
 
     def reset(self, interpreter):
         self._time.set(interpreter.time)
@@ -147,6 +302,7 @@ class StatechartFrame(ttk.Frame):
 
         # States
         self._w_statelist = ttk.Treeview(self._w_labelframe, columns=('type',), selectmode=tk.BROWSE, show='tree')
+        self._w_statelist.column('#0', width=120, stretch=1)
         self._w_statelist.column('type', width=30, anchor=tk.CENTER, stretch=0)
 
         self._w_statelist.tag_configure('state_active', foreground='steel blue')
@@ -265,8 +421,8 @@ class ContextFrame(ttk.Frame):
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
         # Context
-        self._w_context = ttk.Treeview(self._w_labelframe, columns=('value',), selectmode=tk.NONE)
-        self._w_context.column('#0', width=35)
+        self._w_context = ttk.Treeview(self._w_labelframe, columns=('value',), selectmode=tk.BROWSE)
+        self._w_context.column('#0', width=100)
         self._w_context.heading('#0', text='variable')
         self._w_context.column('value', width=100)
         self._w_context.heading('value', text='value')
@@ -373,8 +529,8 @@ class ExecuteInterpreterFrame(ttk.Frame):
 
         main_frame = ttk.Frame(vertical_pane)
         self._w_logs_frame = LogsFrame(vertical_pane, self._interpreter)
-        vertical_pane.add(main_frame, weight=1)
-        vertical_pane.add(self._w_logs_frame)
+        vertical_pane.add(main_frame, weight=3)
+        vertical_pane.add(self._w_logs_frame, weight=1)
 
         # Statechart & context
         horizontal_pane = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
@@ -386,25 +542,33 @@ class ExecuteInterpreterFrame(ttk.Frame):
         horizontal_pane.add(self._w_context_frame, weight=1)
 
         # Events, time and execution
-        self._w_events_frame = EventsFrame(main_frame, self._interpreter)
-        self._w_time_frame = TimeFrame(main_frame, self._interpreter)
-        execution_frame = ttk.LabelFrame(main_frame, text='Execution')
+        left_column_frame = ttk.Frame(main_frame, relief=tk.RAISED, borderwidth=3, padding=H_SPACE)
+        left_column_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        ttk.Frame(main_frame, width=H_SPACE).pack(side=tk.RIGHT)
+        self._w_events_frame = EventsFrame(left_column_frame, self._interpreter)
+        self._w_time_frame = TimeFrame(left_column_frame, self._interpreter)
+        execution_frame = ttk.LabelFrame(left_column_frame, text='Execution')
+
         self._w_events_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self._w_time_frame.pack(side=tk.TOP, fill=tk.X)
         execution_frame.pack(side=tk.TOP, fill=tk.X)
 
-        label = ttk.Label(execution_frame, text='step interval (in ms)')
-        self._w_refresh_entry = ttk.Entry(execution_frame, width=5, justify=tk.RIGHT, textvariable=self._v_autorun_delay)
+        interval_frame = ttk.Frame(execution_frame)
+        interval_frame.pack(side=tk.TOP, anchor=tk.CENTER)
+        interval_label = ttk.Label(interval_frame, text='step interval: ')
+        interval_entry = ttk.Entry(interval_frame, width=5, justify=tk.RIGHT, textvariable=self._v_autorun_delay)
+        interval_label_ms = ttk.Label(interval_frame, text='ms')
+        interval_label.pack(side=tk.LEFT, anchor=tk.E)
+        interval_entry.pack(side=tk.LEFT)
+        interval_label_ms.pack(side=tk.LEFT, anchor=tk.W)
+
+        ttk.Frame(execution_frame, height=V_SPACE).pack(side=tk.TOP)
+
         self._w_execute_btn = ttk.Button(execution_frame, text='Execute', width=14, command=self.execute)
         self._w_run_btn = ttk.Button(execution_frame, text='Run statechart', width=14, command=self._cmd_run_btn)
         self._w_reset_btn = ttk.Button(execution_frame, text='Reset statechart', width=14, command=self.reset)
         self._w_multiple_checkbox = ttk.Checkbutton(execution_frame, text='force step by step', variable=self._v_multiple_checkbox)
 
-        label.pack(side=tk.TOP)
-        self._w_refresh_entry.pack(side=tk.TOP)
-        ttk.Frame(execution_frame, height=V_SPACE).pack(side=tk.TOP)
         self._w_execute_btn.pack(side=tk.TOP)
         self._w_run_btn.pack(side=tk.TOP)
         self._w_reset_btn.pack(side=tk.TOP)
@@ -501,21 +665,9 @@ class ChooseInterpreterFrame(tk.Frame):
         # Context
         context_frame = ttk.LabelFrame(self, text='Context')
         context_frame.pack(side=tk.TOP, fill=tk.BOTH, pady=V_SPACE)
-        context_label = ttk.Label(context_frame, text='You can define an initial context using the following text entry.'
-                                                      '\nSismic expects this entry to be a dictionary like structure.')
-        context_text = tk.Text(context_frame, width=60, height=6, wrap=tk.NONE)
-        context_text.insert('1.0', '{  # Content here, using \'key\': value, followed by a comma\n\n}\n')
-        context_scrollbar_h = ttk.Scrollbar(context_frame, orient=tk.HORIZONTAL, command=context_text.xview)
-        context_scrollbar_v = ttk.Scrollbar(context_frame, command=context_text.yview)
-        context_text.config(xscrollcommand=context_scrollbar_h.set, yscrollcommand=context_scrollbar_v.set)
 
-        context_frame.grid_rowconfigure(1, weight=1)
-        context_frame.grid_columnconfigure(0, weight=1)
-
-        context_label.grid(row=0, column=0, columnspan=2, sticky=tk.W)
-        context_text.grid(row=1, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
-        context_scrollbar_v.grid(row=1, column=1, sticky=tk.N + tk.S)
-        context_scrollbar_h.grid(row=2, column=0, sticky=tk.E + tk.W)
+        context_dictframe = DictFrame(context_frame, initial={}, padding=H_SPACE)
+        context_dictframe.pack(fill=tk.BOTH, expand=1)
 
         # Button
         button = ttk.Button(self, text='Next', command=self._cmd_start)
@@ -524,7 +676,7 @@ class ChooseInterpreterFrame(tk.Frame):
         # Expose some of them
         self._w_file_chosen = file_chosen
         self._w_contract_check = contract_check
-        self._w_context_text = context_text
+        self._w_contextdict_frame = context_dictframe
 
     def _cmd_choose(self):
         choice = filedialog.askopenfilename(filetypes=[('YAML files', '.yaml'), ('All files', '*')])
@@ -549,14 +701,7 @@ class ChooseInterpreterFrame(tk.Frame):
         ignore_contract = (tuple() == self._w_contract_check.state())
 
         # Check context
-        context = self._w_context_text.get('0.1', tk.END)
-        try:
-            context = eval(context)
-        except Exception as e:
-            messagebox.showerror('Error', 'Unable to parse initial context:\n{}\n\n{}\n{}'.format(
-                context, e.__class__.__name__, e
-            ))
-            return
+        context = self._w_contextdict_frame.get_dict()
 
         self.destroy()
         self.master.wm_minsize(800, 600)
