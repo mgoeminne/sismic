@@ -93,7 +93,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'gui_scripts': [
-          'sismic-ui = sismic.ui:main',
+          'sismic-execute = sismic.ui.execute:main',
         ],
         #'console_scripts': [
         #    'sismic=sismic:_parse_args',
