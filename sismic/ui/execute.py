@@ -10,6 +10,12 @@ from sismic.testing import ConditionFailed
 H_SPACE = 4
 V_SPACE = 4
 
+# TODO: Column to indicate state type
+# TODO: Make the context editable
+# TODO: Breakpoints?
+# TODO: Interpreter bind?
+# TODO: Stories (import/export)?
+
 
 class EventsFrame(ttk.Frame):
     def __init__(self, master, interpreter, **kwargs):
