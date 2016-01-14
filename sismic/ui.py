@@ -375,7 +375,7 @@ class ExecuteInterpreterFrame(ttk.Frame):
         self._w_time_frame.pack(side=tk.TOP, fill=tk.X)
         execution_frame.pack(side=tk.TOP, fill=tk.X)
 
-        label = ttk.Label(execution_frame, text='execution rate (in ms)')
+        label = ttk.Label(execution_frame, text='step interval (in ms)')
         self._w_refresh_entry = ttk.Entry(execution_frame, width=5, justify=tk.RIGHT, textvariable=self._v_autorun_delay)
         self._w_execute_btn = ttk.Button(execution_frame, text='Execute', width=14, command=self.execute)
         self._w_run_btn = ttk.Button(execution_frame, text='Run statechart', width=14, command=self._cmd_run_btn)
