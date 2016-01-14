@@ -29,10 +29,11 @@ class EventsFrame(ttk.Frame):
 
         # Event list
         list_frame = ttk.Frame(self._w_labelframe)
-        list_frame.pack(side=tk.TOP, fill=tk.X, expand=True)
+        list_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         list_frame.grid_columnconfigure(0, weight=1)
+        list_frame.grid_rowconfigure(0, weight=1)
 
-        self._w_eventlist = ttk.Treeview(list_frame, selectmode=tk.BROWSE, show='tree')
+        self._w_eventlist = ttk.Treeview(list_frame, selectmode=tk.BROWSE, height=3, show='tree')
         self._w_eventlist.column('#0', width=100)
         self._w_eventlist.grid(row=0, column=0, sticky=tk.N + tk.E + tk.S + tk.W)
         self._w_eventlist.bind('<<TreeviewSelect>>', self._cmd_treeview_select, '+')
@@ -374,7 +375,7 @@ class ExecuteInterpreterFrame(ttk.Frame):
         execution_frame = ttk.LabelFrame(main_frame, text='Execution')
 
         ttk.Frame(main_frame, width=H_SPACE).pack(side=tk.RIGHT)
-        self._w_events_frame.pack(side=tk.TOP, fill=tk.X)
+        self._w_events_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self._w_time_frame.pack(side=tk.TOP, fill=tk.X)
         execution_frame.pack(side=tk.TOP, fill=tk.X)
 
