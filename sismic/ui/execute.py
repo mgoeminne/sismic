@@ -88,7 +88,7 @@ class EventsFrame(ttk.Frame):
     def reset(self, interpreter):
         self._events = []
         self._interpreter = interpreter
-        for event in self._interpreter._statechart.events():
+        for event in self._interpreter.statechart.events():
             self._w_eventlist.insert('', tk.END, text=event)
 
     def update_content(self, steps=None):
@@ -172,10 +172,10 @@ class StatechartFrame(ttk.Frame):
         self._state_items = {}
         self._transition_items = {}
 
-        statechart = self._interpreter._statechart
+        statechart = self._interpreter.statechart
 
         # top-level states
-        for state in self._interpreter._statechart.children:
+        for state in self._interpreter.statechart.children:
             item = self._w_statelist.insert('', tk.END, state, text=state, open=True)
             self._state_items[state] = item
             # Descendants
