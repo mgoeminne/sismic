@@ -4,13 +4,13 @@ from tkinter import messagebox, filedialog
 
 from sismic.interpreter import Interpreter
 from sismic.io import import_from_yaml
-from sismic.model import Event
+from sismic.model import Event, FinalState, OrthogonalState, HistoryState
 from sismic.testing import ConditionFailed
 
 H_SPACE = 4
 V_SPACE = 4
 
-# TODO: Column to indicate state type
+
 # TODO: Make the context editable
 # TODO: Breakpoints?
 # TODO: Interpreter bind?
@@ -146,15 +146,16 @@ class StatechartFrame(ttk.Frame):
         self._w_labelframe.pack(fill=tk.BOTH, expand=True)
 
         # States
-        self._w_statelist = ttk.Treeview(self._w_labelframe, selectmode=tk.NONE, show='tree')
-        self._w_statelist.column('#0', width=200)
+        self._w_statelist = ttk.Treeview(self._w_labelframe, columns=('type',), selectmode=tk.BROWSE, show='tree')
+        self._w_statelist.column('type', width=30, anchor=tk.CENTER, stretch=0)
+
         self._w_statelist.tag_configure('state_active', foreground='steel blue')
         self._w_statelist.tag_configure('state_entered', foreground='forest green')
         self._w_statelist.tag_configure('state_exited', foreground='red')
         self._w_statelist.tag_configure('state_entered_and_exited', foreground='dark orange')
 
         self._w_statelist.tag_configure('transition', foreground='gray')
-        self._w_statelist.tag_configure('transition_active', foreground='red')
+        self._w_statelist.tag_configure('transition_active', foreground='dark orange')
 
         # Scrollbars
         scrollbar_v = ttk.Scrollbar(self._w_labelframe, command=self._w_statelist.yview)
@@ -165,6 +166,17 @@ class StatechartFrame(ttk.Frame):
         self._w_labelframe.grid_rowconfigure(0, weight=1)
         self._w_labelframe.grid_columnconfigure(0, weight=1)
         scrollbar_v.grid(row=0, column=1, sticky=tk.N + tk.S)
+
+    def _state_type(self, state_name):
+        state = self._interpreter.statechart.states[state_name]
+        if isinstance(state, OrthogonalState):
+            return 'P'
+        elif isinstance(state, HistoryState):
+            return 'H*' if state.deep else 'H'
+        elif isinstance(state, FinalState):
+            return 'F'
+        else:
+            return ''
 
     def reset(self, interpreter):
         self._interpreter = interpreter
@@ -177,11 +189,13 @@ class StatechartFrame(ttk.Frame):
         # top-level states
         for state in self._interpreter.statechart.children:
             item = self._w_statelist.insert('', tk.END, state, text=state, open=True)
+            self._w_statelist.set(item, 'type', self._state_type(state))
             self._state_items[state] = item
             # Descendants
             for descendant in statechart.descendants_for(state):
                 parent = statechart._parent[descendant]
                 item = self._w_statelist.insert(parent, tk.END, descendant, text=descendant, open=True)
+                self._w_statelist.set(item, 'type', self._state_type(descendant))
                 self._state_items[descendant] = item
 
         # Transitions
