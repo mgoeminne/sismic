@@ -226,7 +226,7 @@ class EventsFrame(ttk.Frame):
         self._interpreter.queue(Event(event_name, **event_parameters))
 
         # Reset selection and parameters
-        if not self._reset_parameters.get():
+        if self._reset_parameters.get():
             self._event_parameters = {}
             self._w_eventlist.selection_remove(item)
 
